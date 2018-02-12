@@ -1,5 +1,13 @@
+require('dotenv').config();
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const algoliasearch = require('algoliasearch');
+const ALGOLIA_ID = process.env.ALGOLIA_ID;
+const ALGOLIA_ADMIN_KEY = process.env.ALGOLIA_ADMIN_KEY;
+const ALGOLIA_SEARCH_KEY = process.env.ALGOLIA_SEARCH_KEY;
+
+const ALGOLIA_INDEX_NAME = 'users';
+const client = algoliasearch(ALGOLIA_ID, ALGOLIA_ADMIN_KEY);
 
 admin.initializeApp(functions.config().firebase);
 const store = admin.firestore();
@@ -7,6 +15,7 @@ const store = admin.firestore();
 exports.makeUser = functions.auth.user().onCreate(event => {
   const user = event.data;
   const { email, photoURL = '', displayName, uid } = user;
+
   return store
     .collection('/users')
     .doc(uid)
@@ -14,6 +23,15 @@ exports.makeUser = functions.auth.user().onCreate(event => {
       email,
       photoURL,
       displayName
+    })
+    .then(() => {
+      const index = client.initIndex(ALGOLIA_INDEX_NAME);
+      return index.saveObject({
+        email,
+        photoURL,
+        displayName,
+        objectID: uid
+      });
     })
     .catch(err => {
       console.error(err);
